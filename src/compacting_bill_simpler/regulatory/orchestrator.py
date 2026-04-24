@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
+import re
 from typing import Any
 
 from ..text_processing import clean_legislative_text
@@ -143,3 +144,101 @@ def write_preview_payload(path: Path, payload: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def _json_default(value: Any) -> Any:
+    if hasattr(value, "__dataclass_fields__"):
+        return asdict(value)
+    if isinstance(value, Path):
+        return str(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def _write_json(path: Path, payload: Any) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_jsonl(path: Path, rows: list[Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False, default=_json_default) + "\n")
+    return path
+
+
+def default_trace_root(config: PipelineConfig) -> Path:
+    if config.output_dir.name.startswith("preview_"):
+        return config.output_dir.parent
+    return config.output_dir
+
+
+def allocate_trace_dir(config: PipelineConfig, trace_root: Path | None = None) -> Path:
+    root = trace_root or default_trace_root(config)
+    root.mkdir(parents=True, exist_ok=True)
+
+    version_numbers: list[int] = []
+    for path in root.iterdir():
+        if not path.is_dir():
+            continue
+        match = re.fullmatch(r"trace_v(\d+)", path.name)
+        if match:
+            version_numbers.append(int(match.group(1)))
+
+    next_version = max(version_numbers, default=0) + 1
+    return root / f"trace_v{next_version}"
+
+
+def trace_bill(
+    config: PipelineConfig,
+    bill_id: str,
+    trace_dir: Path,
+    *,
+    openai_client: Any | None = None,
+) -> Path:
+    selected = select_bills(config, bill_id=bill_id)
+    bill = selected[0]
+    artifacts = run_bill_pipeline(bill, config, openai_client=openai_client)
+    payload = build_preview_payload(
+        artifacts,
+        config=config,
+        max_sentences=len(artifacts.sentences),
+        max_chunks=len(artifacts.chunks),
+        include_cleaned_text=False,
+    )
+
+    trace_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest = {
+        "bill_id": artifacts.bill.bill_id,
+        "title": artifacts.bill.title,
+        "mode": config.mode,
+        "trace_version": "v1",
+        "pipeline_steps": ["ingest", "clean", "segment", "chunk", "document_profile"],
+        "raw_text_artifact": "01_raw_text.txt",
+        "bill_artifact": "01_bill.json",
+        "cleaned_text_artifact": "02_cleaned_text.txt",
+        "sentences_artifact": "03_sentences.jsonl",
+        "chunks_artifact": "04_chunks.jsonl",
+        "document_profile_artifact": "05_document_profile.json",
+        "preview_artifact": "06_preview.json",
+        "input_csv": str(config.input_csv),
+        "text_column": config.text_column,
+        "id_column": config.id_column,
+        "title_column": config.title_column,
+        "model_preset": config.model_preset,
+    }
+
+    (trace_dir / "01_raw_text.txt").write_text(artifacts.bill.raw_text or "", encoding="utf-8")
+    _write_json(trace_dir / "01_bill.json", artifacts.bill)
+    (trace_dir / "02_cleaned_text.txt").write_text(artifacts.bill.cleaned_text or "", encoding="utf-8")
+    _write_jsonl(trace_dir / "03_sentences.jsonl", artifacts.sentences)
+    _write_jsonl(trace_dir / "04_chunks.jsonl", artifacts.chunks)
+    _write_json(trace_dir / "05_document_profile.json", artifacts.document_profile)
+    _write_json(trace_dir / "06_preview.json", payload)
+    _write_json(trace_dir / "00_manifest.json", manifest)
+    return trace_dir

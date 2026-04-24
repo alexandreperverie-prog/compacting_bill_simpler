@@ -8,9 +8,11 @@ from typing import Any
 from .config import PipelineConfig
 from .llm_profiles import LEGACY_MODEL_PRESET, MODEL_PRESET_DEFAULTS, preset_model_defaults
 from .orchestrator import (
+    allocate_trace_dir,
     build_preview_payload,
     create_openai_client,
     run_preview_pipeline,
+    trace_bill,
     write_preview_payload,
 )
 
@@ -32,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--text-column", default="full_text")
     parser.add_argument("--id-column", default="code")
     parser.add_argument("--title-column", default="title")
-    parser.add_argument("--limit", type=int, default=1)
+    parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--bill-id", default=None, help="Process only this bill ID.")
     parser.add_argument("--mode", choices=["dry-run", "live"], default="dry-run")
     parser.add_argument(
@@ -48,11 +50,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--show-cleaned-text", action="store_true")
     parser.add_argument("--max-preview-sentences", type=int, default=5)
     parser.add_argument("--max-preview-chunks", type=int, default=3)
+    parser.add_argument("--trace-bill-id", default=None, help="Write stage-by-stage trace artifacts for this bill ID.")
+    parser.add_argument("--trace-dir", default=None, help="Optional explicit trace directory. Defaults to dataset/processed/trace_vN.")
     return parser
 
 
 def _build_config(args: argparse.Namespace) -> PipelineConfig:
     preset_defaults = preset_model_defaults(args.model_preset)
+    limit = args.limit
+    if limit is None and args.bill_id is None and args.trace_bill_id is None:
+        limit = 1
+
     return PipelineConfig(
         input_csv=Path(args.input_csv),
         output_dir=Path(args.output_dir),
@@ -67,7 +75,7 @@ def _build_config(args: argparse.Namespace) -> PipelineConfig:
         model_preset=args.model_preset,
         mode=args.mode,
         dry_run=args.mode != "live",
-        limit=args.limit,
+        limit=limit,
         llm_extraction_model=preset_defaults["llm_extraction_model"],
         llm_summary_model=preset_defaults["llm_summary_model"],
         summary_verify_model=preset_defaults["summary_verify_model"],
@@ -84,6 +92,17 @@ def main() -> None:
     args = build_parser().parse_args()
     config = _build_config(args)
     openai_client = create_openai_client(config)
+
+    if args.trace_bill_id:
+        trace_dir = Path(args.trace_dir) if args.trace_dir else allocate_trace_dir(config)
+        written_dir = trace_bill(
+            config,
+            args.trace_bill_id,
+            trace_dir,
+            openai_client=openai_client,
+        )
+        print(f"Trace written to: {written_dir}")
+        return
 
     artifacts_list = run_preview_pipeline(
         config,

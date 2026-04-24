@@ -32,6 +32,7 @@ Après `uv sync` :
 uv run compacting-bill-simpler --limit 1
 uv run compacting-bill-simpler --bill-id ResInv --write-json
 uv run python -m compacting_bill_simpler.regulatory --bill-id ResInv --show-cleaned-text
+uv run compacting-bill-simpler --trace-bill-id 0021
 ```
 
 ## Sortie actuelle
@@ -44,3 +45,28 @@ La CLI affiche un aperçu JSON avec :
 - premières phrases segmentées
 - premiers chunks
 - signaux documentaires globaux
+
+## Trace
+
+Tu peux maintenant lancer un mode trace qui écrit un dossier `dataset/processed/trace_vN/` avec :
+
+- `00_manifest.json`
+- `01_raw_text.txt`
+- `01_bill.json`
+- `02_cleaned_text.txt`
+- `03_sentences.jsonl`
+- `04_chunks.jsonl`
+- `05_document_profile.json`
+- `06_preview.json`
+
+Commande type :
+
+```bash
+uv run compacting-bill-simpler --trace-bill-id 0021
+```
+
+Et si tu veux imposer le dossier :
+
+```bash
+uv run compacting-bill-simpler --trace-bill-id 0021 --trace-dir dataset/processed/trace_v123
+```
