@@ -13,7 +13,18 @@ from .cost_tracker import TrackedOpenAI, UsageTracker, get_usage_tracker
 from .llm_profiles import preset_model_defaults
 from .models import BillRecord, ChunkRecord, Facts, LegalBlock, SentenceRecord
 from .pipeline_profile import PipelineProfile
-from .stages import build_summary, chunk_bill, consolidate_facts, evaluate_quality, extract_effect_facts, extract_scope_facts, ingest_bills, profile_document, segment_bill
+from .stages import (
+    build_summary,
+    chunk_bill,
+    consolidate_facts,
+    evaluate_quality,
+    extract_effect_facts,
+    extract_scope_facts,
+    ingest_bills,
+    profile_document,
+    segment_bill,
+    validate_and_repair_facts,
+)
 
 
 @dataclass
@@ -25,6 +36,10 @@ class PipelineArtifacts:
     document_profile: dict[str, Any]
     scope_extraction: dict[str, Any]
     effects_extraction: dict[str, Any]
+    facts_raw: Facts
+    facts_canonical: dict[str, Any]
+    field_verification: dict[str, Any]
+    field_repairs: dict[str, Any]
     facts: Facts
     quality: dict[str, Any]
     summary: str
@@ -38,6 +53,10 @@ class PipelineArtifacts:
             "document_profile": self.document_profile,
             "scope_extraction": self.scope_extraction,
             "effects_extraction": self.effects_extraction,
+            "facts_raw": self.facts_raw,
+            "facts_canonical": self.facts_canonical,
+            "field_verification": self.field_verification,
+            "field_repairs": self.field_repairs,
             "facts": self.facts,
             "quality": self.quality,
             "summary": self.summary,
@@ -172,18 +191,32 @@ def run_bill_pipeline(
 
     if profile is not None:
         with profile.step("facts"):
-            facts = consolidate_facts(
+            facts_raw = consolidate_facts(
                 bill,
                 legal_blocks,
                 scope_extraction,
                 effects_extraction,
             )
+            facts_raw, facts_canonical, field_verification, field_repairs, facts = validate_and_repair_facts(
+                bill,
+                sentences,
+                facts_raw,
+                config=config,
+                llm_client=openai_client,
+            )
     else:
-        facts = consolidate_facts(
+        facts_raw = consolidate_facts(
             bill,
             legal_blocks,
             scope_extraction,
             effects_extraction,
+        )
+        facts_raw, facts_canonical, field_verification, field_repairs, facts = validate_and_repair_facts(
+            bill,
+            sentences,
+            facts_raw,
+            config=config,
+            llm_client=openai_client,
         )
 
     if profile is not None:
@@ -213,6 +246,10 @@ def run_bill_pipeline(
         document_profile=document_profile,
         scope_extraction=scope_extraction,
         effects_extraction=effects_extraction,
+        facts_raw=facts_raw,
+        facts_canonical=facts_canonical,
+        field_verification=field_verification,
+        field_repairs=field_repairs,
         facts=facts,
         quality=quality,
         summary=summary,
@@ -406,6 +443,11 @@ def trace_bill(
         "legal_blocks_artifact": "06_legal_blocks.json",
         "scope_extraction_artifact": "07_scope_extraction.json",
         "effects_extraction_artifact": "08_effects_extraction.json",
+        "facts_raw_artifact": "09a_facts_raw.json",
+        "facts_canonical_artifact": "09b_facts_canonical.json",
+        "field_verification_artifact": "09c_field_verification.json",
+        "field_repairs_artifact": "09d_field_repairs.json",
+        "facts_validated_artifact": "09e_facts_validated.json",
         "facts_artifact": "09_facts.json",
         "quality_artifact": "10_quality.json",
         "summary_artifact": "11_summary.txt",
@@ -431,6 +473,11 @@ def trace_bill(
     _write_json(trace_dir / "06_legal_blocks.json", artifacts.legal_blocks)
     _write_json(trace_dir / "07_scope_extraction.json", artifacts.scope_extraction)
     _write_json(trace_dir / "08_effects_extraction.json", artifacts.effects_extraction)
+    _write_json(trace_dir / "09a_facts_raw.json", artifacts.facts_raw)
+    _write_json(trace_dir / "09b_facts_canonical.json", artifacts.facts_canonical)
+    _write_json(trace_dir / "09c_field_verification.json", artifacts.field_verification)
+    _write_json(trace_dir / "09d_field_repairs.json", artifacts.field_repairs)
+    _write_json(trace_dir / "09e_facts_validated.json", artifacts.facts)
     _write_json(trace_dir / "09_facts.json", artifacts.facts)
     _write_json(trace_dir / "10_quality.json", artifacts.quality)
     (trace_dir / "11_summary.txt").write_text(artifacts.summary, encoding="utf-8")

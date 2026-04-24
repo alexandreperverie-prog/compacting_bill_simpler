@@ -57,6 +57,11 @@ class TraceTests(unittest.TestCase):
                 "06_legal_blocks.json",
                 "07_scope_extraction.json",
                 "08_effects_extraction.json",
+                "09a_facts_raw.json",
+                "09b_facts_canonical.json",
+                "09c_field_verification.json",
+                "09d_field_repairs.json",
+                "09e_facts_validated.json",
                 "09_facts.json",
                 "10_quality.json",
                 "11_summary.txt",
@@ -70,4 +75,5 @@ class TraceTests(unittest.TestCase):
             self.assertEqual(manifest["cleaned_text_artifact"], "02_cleaned_text.txt")
             self.assertEqual(manifest["legal_blocks_artifact"], "06_legal_blocks.json")
             self.assertEqual(manifest["facts_artifact"], "09_facts.json")
+            self.assertEqual(manifest["facts_validated_artifact"], "09e_facts_validated.json")
             self.assertEqual(manifest["timing_artifact"], "13_pipeline_timing.json")

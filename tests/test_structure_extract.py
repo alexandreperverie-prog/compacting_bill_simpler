@@ -11,7 +11,15 @@ if str(SRC_DIR) not in sys.path:
 
 from compacting_bill_simpler.regulatory.config import PipelineConfig
 from compacting_bill_simpler.regulatory.models import BillRecord, ChunkRecord, LegalBlock, SentenceRecord
-from compacting_bill_simpler.regulatory.stages import build_legal_blocks, build_summary, classify_legal_blocks, consolidate_facts, refine_legal_blocks
+from compacting_bill_simpler.regulatory.stages import (
+    build_legal_blocks,
+    build_summary,
+    canonicalize_facts,
+    classify_legal_blocks,
+    consolidate_facts,
+    refine_legal_blocks,
+    validate_and_repair_facts,
+)
 
 
 class _FakeResponse:
@@ -142,6 +150,59 @@ class StructureExtractTests(unittest.TestCase):
         self.assertIn("THRESHOLDS - Exceed twenty-five million dollars ($25,000,000) in revenue.", summary)
         self.assertIn("LOGIC - Applies only if revenue exceeds $25M.", summary)
 
+    def test_canonicalize_facts_preserves_conjunctive_branch_logic(self) -> None:
+        bill = BillRecord("B1", "Test", None, "unused")
+        facts = {
+            "title": "Test Bill",
+            "applicability": {
+                "thresholds": [
+                    {"type": "revenue", "operator": ">", "value": "25000000", "unit": "USD", "metric": "revenue", "text": "Exceed $25,000,000 in revenue"},
+                    {"type": "consumer_count", "operator": ">=", "value": "25000", "unit": "consumers", "metric": "consumers_processed", "text": "At least 25,000 consumers"},
+                    {"type": "other", "operator": ">", "value": "50", "unit": "percent", "metric": "gross_revenue_from_sale_of_personal_information", "text": "More than 50% of gross revenue from sale of personal information"},
+                    {"type": "consumer_count", "operator": ">=", "value": "175000", "unit": "consumers", "metric": "consumers_processed_per_calendar_year", "text": "At least 175,000 consumers per calendar year"},
+                ]
+            },
+            "powers": [],
+            "sanctions": [],
+            "prohibitions": [],
+        }
+
+        canonical = canonicalize_facts(bill, facts)
+        thresholds = canonical["applicability"]["thresholds"]
+        percent_row = next(row for row in thresholds if row.get("logic_tag") == "branch_1_revenue_share")
+        branch_1_consumer = next(row for row in thresholds if row.get("logic_tag") == "branch_1_consumer_count")
+
+        self.assertFalse(percent_row["standalone"])
+        self.assertEqual(percent_row["branch_id"], "branch_1")
+        self.assertEqual(branch_1_consumer["branch_id"], "branch_1")
+        self.assertIn("revenue > 25000000 AND", canonical["applicability"]["condition_logic"])
+
+    def test_build_summary_uses_enforcement_powers_when_sanctions_empty(self) -> None:
+        facts = {
+            "title": "Test Bill",
+            "applicability": {
+                "scope_summary": "Scope.",
+                "thresholds": [],
+                "condition_logic_summary": "Logic.",
+                "excluded_entities": [],
+            },
+            "obligations": [],
+            "prohibitions": [
+                {"text": "A violation of this part shall not serve as the basis for a private right of action."}
+            ],
+            "powers": [
+                {"text": "The attorney general and reporter has exclusive authority to enforce this part."},
+                {"text": "The attorney general and reporter may issue a civil investigative demand."},
+            ],
+            "sanctions": [],
+            "definitions": [],
+        }
+
+        summary = build_summary(facts, {"judge_verdict": "approved", "judge_score": 0.9, "judge_issues": []})
+
+        self.assertIn("exclusive authority to enforce", summary)
+        self.assertIn("private right of action", summary)
+
     def test_refine_legal_blocks_splits_only_targeted_parent(self) -> None:
         config = PipelineConfig(mode="live", dry_run=False)
         bill = BillRecord("B1", "Test", None, "unused")
@@ -208,6 +269,42 @@ class StructureExtractTests(unittest.TestCase):
         self.assertEqual([block.role for block in refined[1:]], ["consumer_rights", "controller_duties"])
         self.assertEqual(refined[1].sentence_ids, [0, 1])
         self.assertEqual(refined[2].sentence_ids, [2, 3])
+
+    def test_validate_and_repair_facts_dry_run_keeps_validated_trace(self) -> None:
+        config = PipelineConfig(mode="dry-run", dry_run=True)
+        bill = BillRecord("B1", "Test", None, "unused", cleaned_text="This part does not apply to consumer reporting agencies under the Fair Credit Reporting Act.")
+        sentences = [SentenceRecord("B1", 0, 0, bill.cleaned_text or "", 12, 0, 90, 0)]
+        facts_raw = {
+            "bill_id": "B1",
+            "title": "Test",
+            "applicability": {
+                "covered_entities": ["controller"],
+                "excluded_entities": [],
+                "thresholds": [],
+                "scope_summary": "Test.",
+            },
+            "obligations": [],
+            "prohibitions": [],
+            "powers": [],
+            "sanctions": [],
+            "rights": [],
+            "eligibility_conditions": [],
+            "definitions": [],
+            "trace": {"scope_mode": "full_context", "effects_mode": "full_context", "no_legal_blocks": True},
+        }
+
+        facts_raw, facts_canonical, verification, repairs, facts_validated = validate_and_repair_facts(
+            bill,
+            sentences,
+            facts_raw,
+            config=config,
+            llm_client=None,
+        )
+
+        self.assertIn("validation_applied", facts_validated["trace"])
+        self.assertIn("applicability", verification)
+        self.assertFalse(repairs["applicability"]["apply_repair"])
+        self.assertEqual(facts_raw["bill_id"], facts_canonical["bill_id"])
 
 
 if __name__ == "__main__":
