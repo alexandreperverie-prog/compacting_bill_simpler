@@ -1,7 +1,52 @@
 [project]
 name = "compacting-bill-simpler"
 version = "0.1.0"
-description = "Add your description here"
+description = "Simplified bill preprocessing pipeline rebuilt from compacting_bills."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "dotenv>=0.9.9",
+    "faiss-cpu>=1.13.2",
+    "ipykernel>=7.2.0",
+    "numpy>=2.4.3",
+    "openai>=1.109.1",
+    "pandas>=3.0.1",
+    "pymongo>=4.16.0",
+    "spacy>=3.8.11",
+    "tiktoken>=0.12.0",
+    "tqdm>=4.67.0",
+]
+
+[project.scripts]
+compacting-bill-simpler = "compacting_bill_simpler.regulatory.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.uv.sources]
+ipykernel = { index = "pypi" }
+tiktoken = { index = "pypi" }
+spacy = { index = "pypi" }
+pymongo = { index = "pypi" }
+dotenv = { index = "pypi" }
+pandas = { index = "pypi" }
+numpy = { index = "pypi" }
+faiss-cpu = { index = "pypi" }
+openai = { index = "pypi" }
