@@ -1,0 +1,43 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+
+# Node.js
+node_modules/
+
+# ── Datasets (large, not versioned) ──────────────────────────────────────────
+dataset/**
+!dataset/
+!dataset/df_legiscan_title_text_id.csv.gz
+
+# ── Embedding caches (large binary files, not versioned) ─────────────────────
+embedding_fulltext_sentences/
+embeddings_chunk400_overlap50/
+embeddings_topic_desc_llm/
+
+# Renamed / consolidated caches
+cache_fulltext_large/
+cache_title/
+
+# Topic embedding pickle caches
+embeddings_topic_desc/
+embeddings_topic_desc_voyageai/
+
+# ── Dataset CSV files ─────────────────────────────────────────────────────────
+**/*.csv
+
+# ── Legacy patterns (kept for safety) ────────────────────────────────────────
+datasets/
+**/datasets/
+**/embeddings_cache*/
+**/.embeddings*/
+
+.DS_Store
