@@ -57,6 +57,7 @@ Rules:
 - Keep exclusions and exemptions separate from covered entities.
 - Do not invent dates, entities, thresholds, or logic not supported by the text.
 - Only include high-value definitions that materially help interpret scope.
+- If no structural blocks are provided, return empty evidence_block_ids arrays.
 
 INPUT:
 __INPUT__
@@ -128,6 +129,7 @@ Rules:
 - Keep rights separate from obligations and prohibitions.
 - Sanctions/consequences must be actual enforcement consequences, not ordinary violations or headings.
 - Use only the provided text.
+- If no structural blocks are provided, return empty evidence_block_ids arrays.
 
 INPUT:
 __INPUT__
@@ -478,6 +480,7 @@ def consolidate_facts(
         "trace": {
             "scope_mode": scope_trace.get("mode"),
             "effects_mode": effects_trace.get("mode"),
+            "no_legal_blocks": not bool(blocks),
         },
     }
     return facts
@@ -501,7 +504,12 @@ def evaluate_quality(
     field_coverage = round(sum(1 for value in critical_present.values() if value) / len(critical_present), 4)
     evidence_items = obligations + prohibitions + sanctions
     with_evidence = sum(1 for item in evidence_items if item.get("evidence_block_ids"))
-    evidence_coverage = round(with_evidence / max(1, len(evidence_items)), 4) if evidence_items else 1.0
+    trace = facts.get("trace") or {}
+    no_structural_blocks = bool(trace.get("no_legal_blocks"))
+    if no_structural_blocks:
+        evidence_coverage = 1.0
+    else:
+        evidence_coverage = round(with_evidence / max(1, len(evidence_items)), 4) if evidence_items else 1.0
     issues: list[str] = []
     if applicability.get("applies_to_client") == "uncertain":
         issues.append("applicability unresolved")
@@ -544,6 +552,7 @@ def evaluate_quality(
         "top_prohibitions": [item.get("text") for item in prohibitions[:5]],
         "top_sanctions": [item.get("text") for item in sanctions[:5]],
         "deterministic": deterministic,
+        "no_structural_blocks": no_structural_blocks,
     }
     llm = _call_json_completion(
         llm_client,

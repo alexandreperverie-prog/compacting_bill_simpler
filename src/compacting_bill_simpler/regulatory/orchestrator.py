@@ -13,20 +13,7 @@ from .cost_tracker import TrackedOpenAI, UsageTracker, get_usage_tracker
 from .llm_profiles import preset_model_defaults
 from .models import BillRecord, ChunkRecord, Facts, LegalBlock, SentenceRecord
 from .pipeline_profile import PipelineProfile
-from .stages import (
-    build_legal_blocks,
-    build_summary,
-    classify_legal_blocks,
-    chunk_bill,
-    consolidate_facts,
-    evaluate_quality,
-    extract_effect_facts,
-    extract_scope_facts,
-    ingest_bills,
-    profile_document,
-    refine_legal_blocks,
-    segment_bill,
-)
+from .stages import build_summary, chunk_bill, consolidate_facts, evaluate_quality, extract_effect_facts, extract_scope_facts, ingest_bills, profile_document, segment_bill
 
 
 @dataclass
@@ -147,33 +134,9 @@ def run_bill_pipeline(
 
     if profile is not None:
         with profile.step("legal_blocks"):
-            legal_blocks = refine_legal_blocks(
-                bill,
-                classify_legal_blocks(
-                    bill,
-                    build_legal_blocks(bill, sentences, chunks),
-                    config=config,
-                    llm_client=openai_client,
-                ),
-                sentences,
-                chunks,
-                config=config,
-                llm_client=openai_client,
-            )
+            legal_blocks: list[LegalBlock] = []
     else:
-        legal_blocks = refine_legal_blocks(
-            bill,
-            classify_legal_blocks(
-                bill,
-                build_legal_blocks(bill, sentences, chunks),
-                config=config,
-                llm_client=openai_client,
-            ),
-            sentences,
-            chunks,
-            config=config,
-            llm_client=openai_client,
-        )
+        legal_blocks = []
 
     if profile is not None:
         with profile.step("scope_extract"):
@@ -453,6 +416,7 @@ def trace_bill(
         "title_column": config.title_column,
         "model_preset": config.model_preset,
         "timing_artifact": "13_pipeline_timing.json",
+        "no_legal_blocks": True,
     }
     tracker = get_usage_tracker(openai_client)
     if tracker is not None:
