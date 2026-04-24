@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 LEGACY_MODEL_PRESET = "legacy"
+GPT51_MODEL_PRESET = "gpt51_all"
 GPT54_MODEL_PRESET = "gpt54_all"
 
 MODEL_PRESET_DEFAULTS: dict[str, dict[str, Any]] = {
@@ -12,6 +13,13 @@ MODEL_PRESET_DEFAULTS: dict[str, dict[str, Any]] = {
         "llm_summary_model": "gpt-5-nano",
         "summary_verify_model": None,
         "summary_postprocess_model": "gpt-4o-mini",
+    },
+    GPT51_MODEL_PRESET: {
+        "long_sentence_model": "gpt-5.1",
+        "llm_extraction_model": "gpt-5.1",
+        "llm_summary_model": "gpt-5.1",
+        "summary_verify_model": "gpt-5.1",
+        "summary_postprocess_model": "gpt-5.1",
     },
     GPT54_MODEL_PRESET: {
         "long_sentence_model": "gpt-5.4",

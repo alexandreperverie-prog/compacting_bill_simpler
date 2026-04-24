@@ -54,10 +54,20 @@ class TraceTests(unittest.TestCase):
                 "03_sentences.jsonl",
                 "04_chunks.jsonl",
                 "05_document_profile.json",
-                "06_preview.json",
+                "06_legal_blocks.json",
+                "07_scope_extraction.json",
+                "08_effects_extraction.json",
+                "09_facts.json",
+                "10_quality.json",
+                "11_summary.txt",
+                "12_preview.json",
+                "13_pipeline_timing.json",
             }
             self.assertEqual(expected_files, {path.name for path in result_dir.iterdir()})
 
             manifest = json.loads((result_dir / "00_manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["bill_id"], "0021")
             self.assertEqual(manifest["cleaned_text_artifact"], "02_cleaned_text.txt")
+            self.assertEqual(manifest["legal_blocks_artifact"], "06_legal_blocks.json")
+            self.assertEqual(manifest["facts_artifact"], "09_facts.json")
+            self.assertEqual(manifest["timing_artifact"], "13_pipeline_timing.json")

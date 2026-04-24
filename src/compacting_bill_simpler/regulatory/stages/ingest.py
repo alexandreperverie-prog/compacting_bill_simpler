@@ -10,7 +10,8 @@ from ..models import BillRecord
 
 
 def ingest_bills(config: PipelineConfig) -> list[BillRecord]:
-    df = pd.read_csv(resolve_maybe_compressed_csv(config.input_csv))
+    dtype_map = {config.id_column: "string"} if config.id_column else None
+    df = pd.read_csv(resolve_maybe_compressed_csv(config.input_csv), dtype=dtype_map)
     if config.limit is not None:
         df = df.head(config.limit)
 

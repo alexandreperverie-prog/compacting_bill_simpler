@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from .llm_profiles import LEGACY_MODEL_PRESET, normalize_model_preset, preset_model_defaults
+from .llm_profiles import GPT51_MODEL_PRESET, normalize_model_preset, preset_model_defaults
 
 
 @dataclass(frozen=True)
@@ -19,22 +19,23 @@ class PipelineConfig:
     chunk_min_tokens: int = 140     # soft lower target for chunk size
     chunk_max_tokens: int = 220     # maximum cl100k_base tokens per chunk (hard stop)
     long_sentence_threshold: int = 140   # cl100k_base tokens above which a sentence is "too long"
-    long_sentence_model: str = "gpt-5-nano"  # LLM used to split long sentences
-    model_preset: str = LEGACY_MODEL_PRESET
+    long_sentence_model: str = "gpt-5.1"  # LLM used to split long sentences
+    model_preset: str = GPT51_MODEL_PRESET
     retrieval_topk: int = 8
     mode: str = "dry-run"
     dry_run: bool = True
     limit: int | None = None
     embedding_model: str = "text-embedding-3-large"
-    llm_extraction_model: str = "gpt-4o-mini"
-    llm_summary_model: str = "gpt-5-nano"
+    llm_extraction_model: str = "gpt-5.1"
+    llm_summary_model: str = "gpt-5.1"
     summary_mode: str = "strict"
     profile_pipeline: bool = False
     summary_verification: bool = True
     summary_verify_model: str | None = None
     summary_verify_apply_reformat: bool = True
     summary_postprocessing: bool = True
-    summary_postprocess_model: str | None = "gpt-4o-mini"
+    summary_postprocess_model: str | None = "gpt-5.1"
+    full_context_max_tokens: int = 50000
     stop_after: str = "postprocess"
     use_structural_rerank: bool = True
     use_background_penalty: bool = True
@@ -54,7 +55,7 @@ class PipelineConfig:
         stop_after = os.getenv("PIPELINE_STOP_AFTER", "postprocess").strip().lower()
         if stop_after not in {"extract", "esg", "quality", "summary", "summary_verify", "postprocess"}:
             stop_after = "postprocess"
-        model_preset = normalize_model_preset(os.getenv("MODEL_PRESET", LEGACY_MODEL_PRESET))
+        model_preset = normalize_model_preset(os.getenv("MODEL_PRESET", GPT51_MODEL_PRESET))
         preset_defaults = preset_model_defaults(model_preset)
         return PipelineConfig(
             input_csv=Path(os.getenv("PIPELINE_INPUT_CSV", "dataset/df_legiscan_title_text_id.csv.gz")),
@@ -69,6 +70,7 @@ class PipelineConfig:
             long_sentence_threshold=int(os.getenv("LONG_SENT_THRESHOLD", "140")),
             long_sentence_model=os.getenv("LONG_SENT_MODEL", preset_defaults["long_sentence_model"]),
             model_preset=model_preset,
+            full_context_max_tokens=int(os.getenv("FULL_CONTEXT_MAX_TOKENS", "50000")),
             retrieval_topk=int(os.getenv("RETRIEVAL_VECTOR_TOPK", "8")),
             mode=mode,
             dry_run=mode != "live",

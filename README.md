@@ -10,9 +10,18 @@ Nouveau point de départ pour reconstruire proprement la pipeline d'analyse des 
 - config de pipeline, presets de modèles, adaptation des kwargs OpenAI
 - chargement du dataset compressé `.csv.gz`
 
-Le but de ce repo n'est pas de garder toute l'ancienne suite tout de suite. Pour l'instant, la pipeline active s'arrête volontairement à :
+Le but de ce repo n'est pas de garder toute l'ancienne suite tout de suite. La nouvelle pipeline active est volontairement courte :
 
-`ingest -> clean -> segment -> chunk`
+`ingest -> clean -> segment -> chunk -> legal_blocks -> scope_extract -> effects_extract -> facts -> quality -> summary`
+
+Principe :
+
+- le texte complet reste la source de vérité quand il tient dans le contexte modèle
+- les chunks servent surtout au debug, à l'ancrage, et au fallback
+- il n'y a que deux extracteurs LLM principaux :
+  - `scope`
+  - `normative_effects`
+- le modèle LLM par défaut du nouveau repo est `gpt-5.1` via le preset `gpt51_all`
 
 ## Structure
 
@@ -33,6 +42,7 @@ uv run compacting-bill-simpler --limit 1
 uv run compacting-bill-simpler --bill-id ResInv --write-json
 uv run python -m compacting_bill_simpler.regulatory --bill-id ResInv --show-cleaned-text
 uv run compacting-bill-simpler --trace-bill-id 0021
+uv run compacting-bill-simpler --mode live --trace-bill-id 0021 --model-preset gpt51_all
 ```
 
 ## Sortie actuelle
@@ -45,6 +55,9 @@ La CLI affiche un aperçu JSON avec :
 - premières phrases segmentées
 - premiers chunks
 - signaux documentaires globaux
+- aperçu des `legal_blocks`
+- aperçu des faits extraits
+- résumé court final
 
 ## Trace
 
@@ -57,7 +70,13 @@ Tu peux maintenant lancer un mode trace qui écrit un dossier `dataset/processed
 - `03_sentences.jsonl`
 - `04_chunks.jsonl`
 - `05_document_profile.json`
-- `06_preview.json`
+- `06_legal_blocks.json`
+- `07_scope_extraction.json`
+- `08_effects_extraction.json`
+- `09_facts.json`
+- `10_quality.json`
+- `11_summary.txt`
+- `12_preview.json`
 
 Commande type :
 

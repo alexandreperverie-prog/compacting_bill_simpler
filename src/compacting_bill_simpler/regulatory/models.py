@@ -48,6 +48,22 @@ class ChunkRecord:
 
 
 @dataclass
+class LegalBlock:
+    bill_id: str
+    block_id: str
+    role: str
+    heading: str | None
+    text: str
+    chunk_ids: list[int] = field(default_factory=list)
+    sentence_ids: list[int] = field(default_factory=list)
+    char_start: int | None = None
+    char_end: int | None = None
+    source_mode: str = "deterministic"
+    confidence: float = 0.0
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass
 class RetrievedChunk:
     bill_id: str
     field_family: str

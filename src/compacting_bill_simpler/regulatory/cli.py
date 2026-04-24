@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import PipelineConfig
-from .llm_profiles import LEGACY_MODEL_PRESET, MODEL_PRESET_DEFAULTS, preset_model_defaults
+from .cost_tracker import get_usage_tracker
+from .llm_profiles import GPT51_MODEL_PRESET, MODEL_PRESET_DEFAULTS, preset_model_defaults
 from .orchestrator import (
     allocate_trace_dir,
     build_preview_payload,
@@ -40,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model-preset",
         choices=sorted(MODEL_PRESET_DEFAULTS),
-        default=LEGACY_MODEL_PRESET,
+        default=GPT51_MODEL_PRESET,
     )
     parser.add_argument("--chunk-min-tokens", type=int, default=140)
     parser.add_argument("--chunk-max-tokens", type=int, default=220)
@@ -124,3 +125,10 @@ def main() -> None:
             output_path = config.output_dir / f"{artifacts.bill.bill_id}.preview.json"
             write_preview_payload(output_path, payload)
             print(f"Wrote preview to {output_path}")
+
+    tracker = get_usage_tracker(openai_client)
+    if tracker is not None and args.write_json:
+        report_path = config.output_dir / "cost_report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        tracker.write_report(report_path)
+        print(f"Wrote cost report to {report_path}")
