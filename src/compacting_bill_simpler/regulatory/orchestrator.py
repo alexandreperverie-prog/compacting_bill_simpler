@@ -24,6 +24,7 @@ from .stages import (
     extract_scope_facts,
     ingest_bills,
     profile_document,
+    refine_legal_blocks,
     segment_bill,
 )
 
@@ -146,16 +147,30 @@ def run_bill_pipeline(
 
     if profile is not None:
         with profile.step("legal_blocks"):
-            legal_blocks = classify_legal_blocks(
+            legal_blocks = refine_legal_blocks(
                 bill,
-                build_legal_blocks(bill, sentences, chunks),
+                classify_legal_blocks(
+                    bill,
+                    build_legal_blocks(bill, sentences, chunks),
+                    config=config,
+                    llm_client=openai_client,
+                ),
+                sentences,
+                chunks,
                 config=config,
                 llm_client=openai_client,
             )
     else:
-        legal_blocks = classify_legal_blocks(
+        legal_blocks = refine_legal_blocks(
             bill,
-            build_legal_blocks(bill, sentences, chunks),
+            classify_legal_blocks(
+                bill,
+                build_legal_blocks(bill, sentences, chunks),
+                config=config,
+                llm_client=openai_client,
+            ),
+            sentences,
+            chunks,
             config=config,
             llm_client=openai_client,
         )

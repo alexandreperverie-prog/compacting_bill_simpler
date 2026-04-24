@@ -229,6 +229,10 @@ def _serialize_blocks(blocks: list[LegalBlock], *, text_limit: int = 4000) -> li
 
 
 def _select_blocks(blocks: list[LegalBlock], roles: set[str]) -> list[LegalBlock]:
+    parent_ids = {block.parent_block_id for block in blocks if block.parent_block_id}
+    selected = [block for block in blocks if block.role in roles and block.block_id not in parent_ids]
+    if selected:
+        return selected
     return [block for block in blocks if block.role in roles]
 
 

@@ -54,12 +54,16 @@ class LegalBlock:
     role: str
     heading: str | None
     text: str
+    parent_block_id: str | None = None
+    level: int = 1
     chunk_ids: list[int] = field(default_factory=list)
     sentence_ids: list[int] = field(default_factory=list)
     char_start: int | None = None
     char_end: int | None = None
     source_mode: str = "deterministic"
     confidence: float = 0.0
+    secondary_roles: list[str] = field(default_factory=list)
+    is_mixed: bool = False
     notes: list[str] = field(default_factory=list)
 
 
